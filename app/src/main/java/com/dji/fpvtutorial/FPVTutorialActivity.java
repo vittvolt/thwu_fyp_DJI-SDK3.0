@@ -29,6 +29,8 @@ import dji.sdk.AirLink.DJILBAirLink.DJIOnReceivedVideoCallback;
 import dji.sdk.Camera.DJICamera;
 import dji.sdk.Camera.DJICamera.CameraReceivedVideoDataCallback;
 import dji.sdk.Codec.DJICodecManager;
+import dji.sdk.FlightController.DJIFlightController;
+import dji.sdk.FlightController.DJIFlightControllerDataType;
 import dji.sdk.Products.DJIAircraft;
 import dji.sdk.base.DJIBaseComponent.DJICompletionCallback;
 import dji.sdk.base.DJIBaseProduct;
@@ -53,6 +55,19 @@ import java.util.List;
 
 
 public class FPVTutorialActivity extends Activity implements View.OnTouchListener, SurfaceTextureListener,OnClickListener{
+
+    //New variables
+    int k = 1;
+    boolean spin_clkwise = false;
+    boolean spin_ctclkwise = false;
+    boolean move_forward = false;
+    boolean move_backward = false;
+
+    DJIFlightController mController = null;
+    boolean control = false;
+
+    Button Enable, TakeOff, Landing, Spinning_CLKWise, Control;
+    TextView text1, text2;
 
     //Color blob detection variables
     private boolean              mIsColorSelected = false;
@@ -129,8 +144,6 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
         IntentFilter filter = new IntentFilter();
         filter.addAction(FPVTutorialApplication.FLAG_CONNECTION_CHANGE);
         registerReceiver(mReceiver, filter);
-
-
     }
 
 
@@ -174,6 +187,57 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
     }
 
     private void initUI() {
+
+        //New buttons initialization
+        text1 = (TextView) findViewById(R.id.text_display01);
+        text2 = (TextView) findViewById(R.id.text_display02);
+
+        Enable = (Button) findViewById(R.id.enable_control);
+        TakeOff = (Button) findViewById(R.id.take_off);
+        Landing = (Button) findViewById(R.id.landing);
+        Control = (Button) findViewById(R.id.control);
+        Spinning_CLKWise = (Button) findViewById(R.id.spin_clkwise);
+
+        Spinning_CLKWise.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    //To make sure there will be no conflictions between flight control commands
+                    spin_ctclkwise = false;
+                    move_forward = false;
+                    move_backward = false;
+                    try {
+                        Thread.sleep(40);
+                    }
+                    catch (Exception e){
+                        e.printStackTrace();
+                    }
+
+                    spin_clkwise = true;
+                    new Thread() {
+                        public void run() {
+                            Spinning_CLKWise();
+                            //Debug
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    text1.setText(String.valueOf(k));
+                                }
+                            });
+                            k = 1 - k;
+                            if(spin_clkwise && control){
+                                handlerTimer.postDelayed(this,100);
+                            }
+                        }
+                    }.start();
+                }
+                else if (event.getAction() == MotionEvent.ACTION_UP) {
+                    spin_clkwise = false;
+                }
+                return false;
+            }
+        });
+
         mConnectStatusTextView = (TextView) findViewById(R.id.ConnectStatusTextView);
         // init mVideoSurface
         mVideoSurface = (TextureView)findViewById(R.id.video_previewer_surface);
@@ -193,6 +257,10 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
         recordAction.setOnClickListener(this);
         captureMode.setOnClickListener(this);
 
+        Enable.setOnClickListener(this);
+        TakeOff.setOnClickListener(this);
+        Landing.setOnClickListener(this);
+        Control.setOnClickListener(this);
     }
 
     private Handler handlerTimer = new Handler();
@@ -296,13 +364,13 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
     //
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-        Log.e(TAG,"onSurfaceTextureSizeChanged");
+        Log.e(TAG, "onSurfaceTextureSizeChanged");
     }
 
     //
     @Override
     public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        Log.e(TAG,"onSurfaceTextureDestroyed");
+        Log.e(TAG, "onSurfaceTextureDestroyed");
         if (mCodecManager != null) {
             mCodecManager.cleanSurface();
             mCodecManager = null;
@@ -314,7 +382,7 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
     //
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-        Log.e(TAG, "onSurfaceTextureUpdated");
+        text2.setText("Window width:" + String.valueOf(mDetector.width) + " height:" + String.valueOf(mDetector.height));
 
         new Thread(new Runnable() {
             @Override
@@ -330,7 +398,7 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
                 Utils.bitmapToMat(frame_bmp, mRgba);  // frame_bmp is in ARGB format, mRgba is in RBGA format
 
                 //Todo: Do image processing stuff here
-                mRgba.convertTo(mRgba,-1,2,0);  // Increase intensity(light compensation) by 2
+                mRgba.convertTo(mRgba,-1,1.6,0);  // Increase intensity(light compensation) by 2
 
                 if (mIsColorSelected) {
                     //Show the error-corrected color
@@ -467,6 +535,27 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
                 stopRecord();
                 break;
             }
+            case R.id.enable_control:{
+                Enable_Virtual_Control();
+                break;
+            }
+            case R.id.take_off:{
+                Take_Off();
+                break;
+            }
+            case R.id.landing:{
+                Landing();
+                break;
+            }
+            case R.id.control:{
+                control = !control;
+                if(!control){
+                    showToast("Virtual control is turned off!");
+                }
+                else{
+                    showToast("Virtual control is turned on!");
+                }
+            }
             default:
                 break;
         }
@@ -478,23 +567,21 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
 
         mCamera = mProduct.getCamera();
 
-        mCamera.setCameraMode(cameraMode, new DJICompletionCallback(){
+        mCamera.setCameraMode(cameraMode, new DJICompletionCallback() {
 
             @Override
-            public void onResult(DJIError error)
-            {
+            public void onResult(DJIError error) {
 
                 if (error == null) {
                     CameraShootPhotoMode photoMode = CameraShootPhotoMode.Single; // Set the camera capture mode as Single mode
 
-                    mCamera.startShootPhoto(photoMode, new DJICompletionCallback(){
+                    mCamera.startShootPhoto(photoMode, new DJICompletionCallback() {
 
                         @Override
-                        public void onResult(DJIError error)
-                        {
+                        public void onResult(DJIError error) {
                             if (error == null) {
                                 showToast("take photo: success");
-                            }else {
+                            } else {
                                 showToast(error.getDescription());
                             }
                         }
@@ -515,11 +602,10 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
 
         mCamera = mProduct.getCamera();
 
-        mCamera.setCameraMode(cameraMode, new DJICompletionCallback(){
+        mCamera.setCameraMode(cameraMode, new DJICompletionCallback() {
 
             @Override
-            public void onResult(DJIError error)
-            {
+            public void onResult(DJIError error) {
 
                 if (error == null) {
 
@@ -631,5 +717,67 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
         touchedRegionHsv.release();
 
         return false;
+    }
+
+    public void Enable_Virtual_Control(){
+        mController = ((DJIAircraft) mProduct).getFlightController();
+        mController.enableVirtualStickControlMode(new DJICompletionCallback() {
+            @Override
+            public void onResult(DJIError djiError) {
+                if (djiError == null){
+                    showToast("Enable virtual controll success!");
+                }
+                else{
+                    showToast(djiError.getDescription());
+                }
+            }
+        });
+    }
+
+    public void Take_Off(){
+        if(mController != null){
+            mController.takeOff(new DJICompletionCallback() {
+                @Override
+                public void onResult(DJIError djiError) {
+                    if (djiError == null){
+                        showToast("Take off success!");
+                    }
+                    else{
+                        showToast(djiError.getDescription());
+                    }
+                }
+            });
+        }
+    }
+
+    public void Landing(){
+        if (mController != null){
+            mController.autoLanding(new DJICompletionCallback() {
+                @Override
+                public void onResult(DJIError djiError) {
+                    if (djiError == null) {
+                        showToast("Landing success!");
+                    } else {
+                        showToast(djiError.getDescription());
+                    }
+                }
+            });
+        }
+    }
+
+    public void Spinning_CLKWise(){
+        mController.setHorizontalCoordinateSystem(DJIFlightControllerDataType.DJIVirtualStickFlightCoordinateSystem.Body);
+        mController.setRollPitchControlMode(DJIFlightControllerDataType.DJIVirtualStickRollPitchControlMode.Angle);
+        mController.setVerticalControlMode(DJIFlightControllerDataType.DJIVirtualStickVerticalControlMode.Velocity);
+        mController.setYawControlMode(DJIFlightControllerDataType.DJIVirtualStickYawControlMode.AngularVelocity);
+
+        mController.sendVirtualStickFlightControlData(new DJIFlightControllerDataType.DJIVirtualStickFlightControlData(0f, 0f, 100f, 0f), new DJICompletionCallback() {
+            @Override
+            public void onResult(DJIError djiError) {
+                if (djiError != null) {
+                    showToast(djiError.getDescription());
+                }
+            }
+        });
     }
 }

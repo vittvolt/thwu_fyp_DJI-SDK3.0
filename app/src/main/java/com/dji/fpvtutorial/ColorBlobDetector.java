@@ -167,8 +167,8 @@ public class ColorBlobDetector {
                 y = rect.y;
                 w = rect.width;
                 h = rect.height;
-                width = original_frame.cols();
-                height = original_frame.rows();
+                width = original_frame.width();
+                height = original_frame.height();
                 x_err = x - width/2;
                 y_err = y - height/2;
                 z_err = w * h - width * height / 4;
