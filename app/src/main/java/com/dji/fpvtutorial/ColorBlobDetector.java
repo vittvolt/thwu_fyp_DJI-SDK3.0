@@ -133,6 +133,13 @@ public class ColorBlobDetector {
         // Filter contours by area and resize to fit the original image size
         mContours.clear();
         each = contours.iterator();
+        //If no contours detected (the object is lost), reset the parameters
+        if (!each.hasNext()) {
+            x_err = 0;
+            y_err = 0;
+            z_err = 0;
+        }
+
         while (each.hasNext()) {
             MatOfPoint contour = each.next();
             if (Imgproc.contourArea(contour) > 0.9 * maxArea) {

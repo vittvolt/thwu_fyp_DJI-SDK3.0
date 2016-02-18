@@ -39,6 +39,7 @@ import dji.sdk.base.DJIError;
 import dji.sdk.Camera.DJICameraSettingsDef.CameraMode;
 import dji.sdk.Camera.DJICameraSettingsDef.CameraShootPhotoMode;
 
+import org.bouncycastle.jce.provider.JCEMac;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
@@ -57,6 +58,10 @@ import java.util.List;
 public class FPVTutorialActivity extends Activity implements View.OnTouchListener, SurfaceTextureListener,OnClickListener{
 
     //New variables
+    float horizontal_par = 0;
+    float vertical_par = 0;
+    boolean in_operation = false;
+
     int k = 1;
     boolean spin_clkwise = false;
     boolean spin_ctclkwise = false;
@@ -202,31 +207,20 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                    //To make sure there will be no conflictions between flight control commands
-                    spin_ctclkwise = false;
-                    move_forward = false;
-                    move_backward = false;
-                    try {
-                        Thread.sleep(40);
-                    }
-                    catch (Exception e){
-                        e.printStackTrace();
-                    }
-
                     spin_clkwise = true;
                     new Thread() {
                         public void run() {
                             Spinning_CLKWise();
                             //Debug
-                            runOnUiThread(new Runnable() {
+                            /*runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
                                     text1.setText(String.valueOf(k));
                                 }
                             });
-                            k = 1 - k;
+                            k = 1 - k; */
                             if(spin_clkwise && control){
-                                handlerTimer.postDelayed(this,100);
+                                handlerTimer.postDelayed(this,50);
                             }
                         }
                     }.start();
@@ -382,59 +376,72 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
     //
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-        text2.setText("Window width:" + String.valueOf(mDetector.width) + " height:" + String.valueOf(mDetector.height));
+        text2.setText("Center X:" + String.valueOf(mDetector.x + mDetector.w / 2) + " Y:" + String.valueOf(mDetector.y + mDetector.h / 2));
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                if (step_count != 5){
-                    step_count++;
-                    return;
-                }
-                else{
-                    step_count = 0;
-                }
-                Bitmap frame_bmp = mVideoSurface.getBitmap();
-                Utils.bitmapToMat(frame_bmp, mRgba);  // frame_bmp is in ARGB format, mRgba is in RBGA format
+        text1.setText("Hori: " + String.valueOf(horizontal_par) + " Verti: " + String.valueOf(vertical_par));
 
-                //Todo: Do image processing stuff here
-                mRgba.convertTo(mRgba,-1,1.6,0);  // Increase intensity(light compensation) by 2
+        if (control && !in_operation) {
+            Send_Flight_Control_Command(0, horizontal_par, 0, vertical_par);
+        }
 
-                if (mIsColorSelected) {
-                    //Show the error-corrected color
-                    mBlobColorHsv = mDetector.get_new_hsvColor();
-                    mBlobColorRgba = converScalarHsv2Rgba(mBlobColorHsv);
-
-                    //Debug
-                    Log.i(TAG, "mDetector rgba color: (" + mBlobColorRgba.val[0] + ", " + mBlobColorRgba.val[1] +
-                            ", " + mBlobColorRgba.val[2] + ", " + mBlobColorRgba.val[3] + ")");
-                    Log.i(TAG, "mDetector hsv color: (" + mBlobColorHsv.val[0] + ", " + mBlobColorHsv.val[1] +
-                            ", " + mBlobColorHsv.val[2] + ", " + mBlobColorHsv.val[3] + ")");
-
-                    mDetector.process(mRgba);
-                    List<MatOfPoint> contours = mDetector.getContours();
-                    Log.e(TAG, "Contours count: " + contours.size());
-                    Imgproc.drawContours(mRgba, contours, -1, CONTOUR_COLOR, 2);
-
-                    Mat colorLabel = mRgba.submat(4, 68, 4, 68);
-                    colorLabel.setTo(mBlobColorRgba);
-
-                    Mat spectrumLabel = mRgba.submat(4, 4 + mSpectrum.rows(), 70, 70 + mSpectrum.cols());
-                    mSpectrum.copyTo(spectrumLabel);
-                }
-
-
-                Utils.matToBitmap(mRgba, frame_bmp);
-                Canvas canvas = mVideoSurface02.lockCanvas();
-                canvas.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR);
-                canvas.drawBitmap(frame_bmp, new Rect(0, 0, frame_bmp.getWidth(), frame_bmp.getHeight()),
-                        new Rect((canvas.getWidth() - frame_bmp.getWidth()) / 2,
-                                (canvas.getHeight() - frame_bmp.getHeight()) / 2,
-                                (canvas.getWidth() - frame_bmp.getWidth()) / 2 + frame_bmp.getWidth(),
-                                (canvas.getHeight() - frame_bmp.getHeight()) / 2 + frame_bmp.getHeight()), null);
-                mVideoSurface02.unlockCanvasAndPost(canvas);
+        if (step_count != 6){
+            step_count++;
+        }
+        else{
+            step_count = 0;
+            horizontal_par = (Math.abs(mDetector.x_err) > mDetector.width / 6) ? mDetector.x_err / 80 : 0;
+            vertical_par = (Math.abs(mDetector.y_err) > mDetector.height / 6) ? -mDetector.y_err / 250 : 0;
+            if (vertical_par > 10) {
+                vertical_par = 10;
+            } else if (vertical_par < -10) {
+                vertical_par = -10;
             }
-        }).start();
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Bitmap frame_bmp = mVideoSurface.getBitmap();
+                    Utils.bitmapToMat(frame_bmp, mRgba);  // frame_bmp is in ARGB format, mRgba is in RBGA format
+
+                    //Todo: Do image processing stuff here
+                    mRgba.convertTo(mRgba,-1,1.6,0);  // Increase intensity(light compensation) by 2
+
+                    if (mIsColorSelected) {
+                        //Show the error-corrected color
+                        mBlobColorHsv = mDetector.get_new_hsvColor();
+                        mBlobColorRgba = converScalarHsv2Rgba(mBlobColorHsv);
+
+                        //Debug
+                        Log.i(TAG, "mDetector rgba color: (" + mBlobColorRgba.val[0] + ", " + mBlobColorRgba.val[1] +
+                                ", " + mBlobColorRgba.val[2] + ", " + mBlobColorRgba.val[3] + ")");
+                        Log.i(TAG, "mDetector hsv color: (" + mBlobColorHsv.val[0] + ", " + mBlobColorHsv.val[1] +
+                                ", " + mBlobColorHsv.val[2] + ", " + mBlobColorHsv.val[3] + ")");
+
+                        mDetector.process(mRgba);
+                        List<MatOfPoint> contours = mDetector.getContours();
+                        Log.e(TAG, "Contours count: " + contours.size());
+                        Imgproc.drawContours(mRgba, contours, -1, CONTOUR_COLOR, 2);
+
+                        Mat colorLabel = mRgba.submat(4, 68, 4, 68);
+                        colorLabel.setTo(mBlobColorRgba);
+
+                        Mat spectrumLabel = mRgba.submat(4, 4 + mSpectrum.rows(), 70, 70 + mSpectrum.cols());
+                        mSpectrum.copyTo(spectrumLabel);
+                    }
+
+
+                    Utils.matToBitmap(mRgba, frame_bmp);
+                    Canvas canvas = mVideoSurface02.lockCanvas();
+                    canvas.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR);
+                    canvas.drawBitmap(frame_bmp, new Rect(0, 0, frame_bmp.getWidth(), frame_bmp.getHeight()),
+                            new Rect((canvas.getWidth() - frame_bmp.getWidth()) / 2,
+                                    (canvas.getHeight() - frame_bmp.getHeight()) / 2,
+                                    (canvas.getWidth() - frame_bmp.getWidth()) / 2 + frame_bmp.getWidth(),
+                                    (canvas.getHeight() - frame_bmp.getHeight()) / 2 + frame_bmp.getHeight()), null);
+                    mVideoSurface02.unlockCanvasAndPost(canvas);
+                }
+            }).start();
+        }
     }
 
     protected BroadcastReceiver mReceiver = new BroadcastReceiver() {
@@ -771,7 +778,23 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
         mController.setVerticalControlMode(DJIFlightControllerDataType.DJIVirtualStickVerticalControlMode.Velocity);
         mController.setYawControlMode(DJIFlightControllerDataType.DJIVirtualStickYawControlMode.AngularVelocity);
 
-        mController.sendVirtualStickFlightControlData(new DJIFlightControllerDataType.DJIVirtualStickFlightControlData(0f, 0f, 100f, 0f), new DJICompletionCallback() {
+        mController.sendVirtualStickFlightControlData(new DJIFlightControllerDataType.DJIVirtualStickFlightControlData(0f, 0f, 40f, 0f), new DJICompletionCallback() {
+            @Override
+            public void onResult(DJIError djiError) {
+                if (djiError != null) {
+                    showToast(djiError.getDescription());
+                }
+            }
+        });
+    }
+
+    public void Send_Flight_Control_Command(float pitch, float roll, float yaw, float throttle){
+        mController.setHorizontalCoordinateSystem(DJIFlightControllerDataType.DJIVirtualStickFlightCoordinateSystem.Body);
+        mController.setRollPitchControlMode(DJIFlightControllerDataType.DJIVirtualStickRollPitchControlMode.Angle);
+        mController.setVerticalControlMode(DJIFlightControllerDataType.DJIVirtualStickVerticalControlMode.Velocity);
+        mController.setYawControlMode(DJIFlightControllerDataType.DJIVirtualStickYawControlMode.AngularVelocity);
+
+        mController.sendVirtualStickFlightControlData(new DJIFlightControllerDataType.DJIVirtualStickFlightControlData(pitch, roll, yaw, throttle), new DJICompletionCallback() {
             @Override
             public void onResult(DJIError djiError) {
                 if (djiError != null) {

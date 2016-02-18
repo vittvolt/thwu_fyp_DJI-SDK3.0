@@ -25,14 +25,14 @@
             android:src="@drawable/selector_back_button" />
 
         <TextView
-            android:layout_toRightOf="@+id/ReturnBtnCamera"
             android:id="@+id/ConnectStatusTextView"
             android:layout_width="150dp"
             android:layout_height="fill_parent"
             android:text=""
             android:textColor="@android:color/white"
             android:textSize="21sp"
-            android:layout_alignParentTop="true" />
+            android:layout_alignParentTop="true"
+            android:layout_toEndOf="@+id/ReturnBtnCamera" />
 
         <TextView
             android:id="@+id/text_display01"
@@ -49,19 +49,24 @@
     
     <TextureView
         android:id="@+id/video_previewer_surface"
-        android:layout_width="match_parent"
+        android:layout_toLeftOf="@+id/dummy"
+        android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="center"
-        android:layout_marginEnd="337dp"
-        android:layout_alignParentEnd="true"
+        android:layout_alignParentLeft="true"
         android:layout_below="@+id/main_title_rl" />
+    <Space android:id="@+id/dummy"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_centerHorizontal="true"
+        android:visibility="invisible"/>
     <TextureView
         android:id="@+id/video_previewer_surface02"
-        android:layout_width="match_parent"
+        android:layout_toRightOf="@+id/dummy"
+        android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="center"
-        android:layout_alignParentStart="true"
-        android:layout_marginStart="344dp"
+        android:layout_alignParentRight="true"
         android:layout_below="@+id/main_title_rl" />
 
     <LinearLayout
@@ -70,7 +75,8 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:layout_above="@+id/Linear2"
-        android:layout_alignParentStart="true">
+        android:layout_alignParentStart="true"
+        android:layout_alignEnd="@+id/video_previewer_surface">
 
         <Button
             android:id="@+id/forward"
