@@ -16,15 +16,16 @@ import java.util.List;
 
 public class ColorBlobDetector {
 
-    public int x = 0;
-    public int y = 0;
+    public int x, rect_center_x = 0;
+    public int y, rect_center_y = 0;
     public int w = 0;
     public int h = 0;
     public int width = 0;
     public int height = 0;
-    public int x_err = 0;
-    public int y_err = 0;
-    public int z_err = 0;
+    public double x_err = 0;
+    public double y_err = 0;
+    public double z_err1 = 0;
+    double BEST_SIZE = 74000;
 
     // Lower and Upper bounds for range checking in HSV color space
     private Scalar mLowerBound = new Scalar(0);
@@ -137,7 +138,7 @@ public class ColorBlobDetector {
         if (!each.hasNext()) {
             x_err = 0;
             y_err = 0;
-            z_err = 0;
+            //z_err = 0;
         }
 
         while (each.hasNext()) {
@@ -174,11 +175,14 @@ public class ColorBlobDetector {
                 y = rect.y;
                 w = rect.width;
                 h = rect.height;
+                //rect_center_x = x + w / 2;
+                //rect_center_y = y + h / 2;
                 width = original_frame.width();
                 height = original_frame.height();
-                x_err = x - width/2;
-                y_err = y - height/2;
-                z_err = w * h - width * height / 4;
+                x_err = x + w/2 - width/2;
+                y_err = y + h/2 - height/2;
+                z_err1 = BEST_SIZE - w * h;  // >=   backward
+                //z_err2 = w * h - width * height / 65;  // <= forward
 
                 //Todo: use the bounding rectangular to calculate average intensity (turn the pixels out of the contour to new_hsvColor)
                 //Just change the boundary values would be enough

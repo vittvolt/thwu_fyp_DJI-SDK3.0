@@ -53,16 +53,21 @@ import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import java.util.List;
+import java.util.StringTokenizer;
+import java.util.Timer;
+import java.util.TimerTask;
 
 
 public class FPVTutorialActivity extends Activity implements View.OnTouchListener, SurfaceTextureListener,OnClickListener{
 
     //New variables
-    float horizontal_par = 0;
-    float vertical_par = 0;
+    float roll_control = 0;
+    float throttle_control = 0;
+    float pitch_control = 0;
+    float yaw_control = 0;
     boolean in_operation = false;
+    Handler handler_command = new Handler();
 
-    int k = 1;
     boolean spin_clkwise = false;
     boolean spin_ctclkwise = false;
     boolean move_forward = false;
@@ -70,6 +75,7 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
 
     DJIFlightController mController = null;
     boolean control = false;
+    PID_Control mPID = new PID_Control();
 
     Button Enable, TakeOff, Landing, Spinning_CLKWise, Control;
     TextView text1, text2;
@@ -149,6 +155,29 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
         IntentFilter filter = new IntentFilter();
         filter.addAction(FPVTutorialApplication.FLAG_CONNECTION_CHANGE);
         registerReceiver(mReceiver, filter);
+
+        //Start the thread for sending the command at a constant frequency
+        //test
+        new Thread() {
+            public void run() {
+                if (mDetector==null)
+                    handler_command.postDelayed(this,50);
+                else if (control){
+                    mPID.update_control_parameter(mDetector.x_err,mDetector.y_err,mDetector.z_err1);
+                    pitch_control = (float) mPID.pitch_control;
+                    roll_control = (float) mPID.roll_control;
+                    throttle_control = (float) mPID.throttle_control;
+
+                    if (Math.abs(pitch_control) < 0.1) pitch_control = 0;
+                    if (Math.abs(pitch_control) > 2) pitch_control = 1.5f;
+                    Send_Flight_Control_Command(pitch_control, 0, yaw_control, 0);
+                    handler_command.postDelayed(this,40);
+                }
+                else{
+                    handler_command.postDelayed(this,40);
+                }
+            }
+        }.start();
     }
 
 
@@ -376,26 +405,20 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
     //
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-        text2.setText("Center X:" + String.valueOf(mDetector.x + mDetector.w / 2) + " Y:" + String.valueOf(mDetector.y + mDetector.h / 2));
-
-        text1.setText("Hori: " + String.valueOf(horizontal_par) + " Verti: " + String.valueOf(vertical_par));
-
-        if (control && !in_operation) {
-            Send_Flight_Control_Command(0, horizontal_par, 0, vertical_par);
-        }
+        //String s1 = String.valueOf(mDetector.x + mDetector.w / 2) + "Y:" + String.valueOf(mDetector.y + mDetector.h / 2);
+        String s1 = "pitch:" + String.valueOf(pitch_control) + "z_crt:" + String.valueOf(mDetector.z_err1);
+        text1.setText(s1);
+        String s2 = "z_int:" + String.valueOf(mPID.z_inte_error);
+        text2.setText(s2);
+        //text1.setText(String.valueOf(mDetector.w * mDetector.h));
+        //String ss = "FrameSize: " + String.valueOf(mDetector.width) + "*" + String.valueOf(mDetector.height);
+        //text2.setText(ss);
 
         if (step_count != 6){
             step_count++;
         }
         else{
             step_count = 0;
-            horizontal_par = (Math.abs(mDetector.x_err) > mDetector.width / 6) ? mDetector.x_err / 80 : 0;
-            vertical_par = (Math.abs(mDetector.y_err) > mDetector.height / 6) ? -mDetector.y_err / 250 : 0;
-            if (vertical_par > 10) {
-                vertical_par = 10;
-            } else if (vertical_par < -10) {
-                vertical_par = -10;
-            }
 
             new Thread(new Runnable() {
                 @Override
