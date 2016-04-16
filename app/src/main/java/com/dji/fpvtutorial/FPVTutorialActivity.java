@@ -12,6 +12,7 @@ import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.util.Log;
 import android.view.Menu;
@@ -52,13 +53,21 @@ import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.List;
 import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.Exchanger;
 
 
 public class FPVTutorialActivity extends Activity implements View.OnTouchListener, SurfaceTextureListener,OnClickListener{
+
+    //fyp report and poster
+    String filename = "";
+    int counter_file = 0;
 
     //New variables
     float roll_control = 0;
@@ -77,7 +86,7 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
     boolean control = false;
     PID_Control mPID = new PID_Control();
 
-    Button Enable, TakeOff, Landing, Spinning_CLKWise, Control;
+    Button Enable, TakeOff, Landing, Spinning_CLKWise, Control, ScreenShot;
     TextView text1, text2;
 
     //Color blob detection variables
@@ -170,7 +179,11 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
 
                     if (Math.abs(pitch_control) < 0.1) pitch_control = 0;
                     if (Math.abs(pitch_control) > 2) pitch_control = 1.5f;
-                    Send_Flight_Control_Command(pitch_control, 0, yaw_control, 0);
+                    if (Math.abs(roll_control) < 0.1) roll_control = 0;
+                    if (Math.abs(roll_control) > 2) roll_control = 1.5f;
+                    if (Math.abs(throttle_control) < 0.1) throttle_control = 0;
+                    if (Math.abs(throttle_control) > 0.9) throttle_control = 0.9f;
+                    Send_Flight_Control_Command(pitch_control, roll_control, yaw_control, throttle_control);
                     handler_command.postDelayed(this,40);
                 }
                 else{
@@ -231,6 +244,45 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
         Landing = (Button) findViewById(R.id.landing);
         Control = (Button) findViewById(R.id.control);
         Spinning_CLKWise = (Button) findViewById(R.id.spin_clkwise);
+        ScreenShot = (Button) findViewById(R.id.screen_shot);
+
+        ScreenShot.setOnTouchListener(new View.OnTouchListener(){
+            @Override
+            public boolean onTouch(View v, MotionEvent event){
+                new Thread() {
+                    public void run() {
+                        filename = "frame" + String.valueOf(counter_file)+".jpg";
+                        counter_file++;
+                        FileOutputStream out = null;
+                        File sd = new File(Environment.getExternalStorageDirectory() + "/fyp_scr_sht");
+                        if (!sd.exists()) {
+                            sd.mkdirs();
+                        }
+                        File dest = new File(sd, filename);
+                        try {
+                            out = new FileOutputStream(dest);
+                            Bitmap bmp = Bitmap.createBitmap(mRgba.cols(), mRgba.rows(), Bitmap.Config.ARGB_8888);
+                            Utils.matToBitmap(mRgba, bmp);
+                            bmp.compress(Bitmap.CompressFormat.JPEG, 80, out);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                        finally {
+                            try {
+                                if (out != null) {
+                                    out.close();
+                                    showToast("OK!");
+                                }
+                            } catch (IOException e) {
+                                Log.d(TAG, e.getMessage() + "Error");
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }.start();
+                return  false;
+            }
+        });
 
         Spinning_CLKWise.setOnTouchListener(new View.OnTouchListener() {
             @Override
