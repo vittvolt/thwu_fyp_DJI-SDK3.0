@@ -1,7 +1,5 @@
 package com.dji.fpvtutorial;
 
-import com.dji.fpvtutorial.R;
-
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -15,8 +13,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.TextureView;
 import android.view.View;
@@ -40,10 +36,6 @@ import dji.sdk.base.DJIError;
 import dji.sdk.Camera.DJICameraSettingsDef.CameraMode;
 import dji.sdk.Camera.DJICameraSettingsDef.CameraShootPhotoMode;
 
-import org.bouncycastle.jce.provider.JCEMac;
-import org.opencv.android.BaseLoaderCallback;
-import org.opencv.android.LoaderCallbackInterface;
-import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
@@ -57,13 +49,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
-import java.util.StringTokenizer;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.Exchanger;
 
 
-public class FPVTutorialActivity extends Activity implements View.OnTouchListener, SurfaceTextureListener,OnClickListener{
+public class uavTrackingMain extends Activity implements View.OnTouchListener, SurfaceTextureListener,OnClickListener{
 
     //fyp report and poster
     String filename = "";
@@ -104,7 +92,7 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
     }
     int step_count = 0;
 
-    private static final String TAG = FPVTutorialActivity.class.getName();
+    private static final String TAG = uavTrackingMain.class.getName();
 
     private static final int INTERVAL_LOG = 300;
     private static long mLastTime = 0l;
@@ -162,7 +150,7 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
 
         // Register the broadcast receiver for receiving the device connection's changes.
         IntentFilter filter = new IntentFilter();
-        filter.addAction(FPVTutorialApplication.FLAG_CONNECTION_CHANGE);
+        filter.addAction(djiBgApplication.FLAG_CONNECTION_CHANGE);
         registerReceiver(mReceiver, filter);
 
         //Start the thread for sending the command at a constant frequency
@@ -356,7 +344,7 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
 
     private void initPreviewer() {
         try {
-            mProduct = FPVTutorialApplication.getProductInstance();
+            mProduct = djiBgApplication.getProductInstance();
         } catch (Exception exception) {
             mProduct = null;
         }
@@ -391,7 +379,7 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
 
     private void uninitPreviewer() {
         try {
-            mProduct = FPVTutorialApplication.getProductInstance();
+            mProduct = djiBgApplication.getProductInstance();
         } catch (Exception exception) {
             mProduct = null;
         }
@@ -533,12 +521,12 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
     private void updateTitleBar() {
         if(mConnectStatusTextView == null) return;
         boolean ret = false;
-        DJIBaseProduct product = FPVTutorialApplication.getProductInstance();
+        DJIBaseProduct product = djiBgApplication.getProductInstance();
         if (product != null) {
 
             if(product.isConnected()) {
                 //The product is connected
-                mConnectStatusTextView.setText(FPVTutorialApplication.getProductInstance().getModel() + " Connected");
+                mConnectStatusTextView.setText(djiBgApplication.getProductInstance().getModel() + " Connected");
                 ret = true;
             } else {
 
@@ -582,7 +570,7 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
     public void showToast(final String msg) {
         runOnUiThread(new Runnable() {
             public void run() {
-                Toast.makeText(FPVTutorialActivity.this, msg, Toast.LENGTH_SHORT).show();
+                Toast.makeText(uavTrackingMain.this, msg, Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -593,7 +581,7 @@ public class FPVTutorialActivity extends Activity implements View.OnTouchListene
     public void onClick(View v) {
 
         try {
-            mProduct = FPVTutorialApplication.getProductInstance();
+            mProduct = djiBgApplication.getProductInstance();
         } catch (Exception exception) {
             mProduct = null;
         }

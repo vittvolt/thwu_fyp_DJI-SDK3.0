@@ -18,9 +18,9 @@ import dji.sdk.base.DJISDKError;
  *
  */
 
-public class FPVTutorialApplication extends Application{
+public class djiBgApplication extends Application{
 
-    //private static final String TAG = FPVTutorialApplication.class.getName();
+    //private static final String TAG = djiBgApplication.class.getName();
 
     public static final String FLAG_CONNECTION_CHANGE = "com_example_fpv_tutorial_connection_change";
 
