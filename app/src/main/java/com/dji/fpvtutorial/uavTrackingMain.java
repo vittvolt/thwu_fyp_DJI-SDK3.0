@@ -47,6 +47,7 @@ import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
 
@@ -56,6 +57,8 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
     //fyp report and poster
     String filename = "";
     int counter_file = 0;
+    boolean collect_data = false;
+    int counter_data = 1;
 
     //New variables
     float roll_control = 0;
@@ -234,12 +237,17 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
         Spinning_CLKWise = (Button) findViewById(R.id.spin_clkwise);
         ScreenShot = (Button) findViewById(R.id.screen_shot);
 
-        ScreenShot.setOnTouchListener(new View.OnTouchListener(){
+        ScreenShot.setOnClickListener(new View.OnClickListener(){
             @Override
-            public boolean onTouch(View v, MotionEvent event){
+            public void onClick(View v){
                 new Thread() {
                     public void run() {
-                        filename = "frame" + String.valueOf(counter_file)+".jpg";
+                        collect_data = !collect_data;
+                        if (collect_data)
+                            showToast("Data collecting began!");
+                        else
+                            showToast("Data collecting terminated!");
+                        /*filename = "frame" + String.valueOf(counter_file)+".jpg";
                         counter_file++;
                         FileOutputStream out = null;
                         File sd = new File(Environment.getExternalStorageDirectory() + "/fyp_scr_sht");
@@ -265,10 +273,9 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
                                 Log.d(TAG, e.getMessage() + "Error");
                                 e.printStackTrace();
                             }
-                        }
+                        } */
                     }
                 }.start();
-                return  false;
             }
         });
 
@@ -467,7 +474,7 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
                     Utils.bitmapToMat(frame_bmp, mRgba);  // frame_bmp is in ARGB format, mRgba is in RBGA format
 
                     //Todo: Do image processing stuff here
-                    mRgba.convertTo(mRgba,-1,1.6,0);  // Increase intensity(light compensation) by 2
+                    mRgba.convertTo(mRgba,-1,1.5,0);  // Increase intensity(light compensation) by 2
 
                     if (mIsColorSelected) {
                         //Show the error-corrected color
@@ -502,6 +509,14 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
                                     (canvas.getWidth() - frame_bmp.getWidth()) / 2 + frame_bmp.getWidth(),
                                     (canvas.getHeight() - frame_bmp.getHeight()) / 2 + frame_bmp.getHeight()), null);
                     mVideoSurface02.unlockCanvasAndPost(canvas);
+
+                    //FYP Report !!!!!!!!!!!!!!!!
+                    if (collect_data){
+                        String s = String.valueOf(counter_data) + " " + String.valueOf(mDetector.x+mDetector.w/2) + " " + String.valueOf(mDetector.y+mDetector.h/2);
+                        s = s + " " + String.valueOf(mDetector.w * mDetector.h) + " " + String.valueOf(mDetector.width) + " " + String.valueOf(mDetector.height) + "\n";
+                        generateNoteOnSD("data01.txt",s);
+                        counter_data++;
+                    }
                 }
             }).start();
         }
@@ -865,5 +880,24 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
                 }
             }
         });
+    }
+
+    // Write to file
+    public void generateNoteOnSD(String sFileName, String sBody){
+        try
+        {
+            File root = new File(Environment.getExternalStorageDirectory(), "fyp_tracking_data");
+            if (!root.exists()) {
+                root.mkdirs();
+            }
+            File gpxfile = new File(root, sFileName);
+            FileWriter writer = new FileWriter(gpxfile, true);
+            writer.append(sBody);
+            writer.flush();
+            writer.close();
+        } catch(IOException e)
+        {
+            e.printStackTrace();
+        }
     }
 }
