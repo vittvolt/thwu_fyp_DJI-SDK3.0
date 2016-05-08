@@ -45,10 +45,18 @@ import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.Socket;
 import java.util.List;
 
 
@@ -60,6 +68,9 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
     boolean collect_data = false;
     int counter_data = 1;
 
+    //Socket Connection
+    String eduroam_pc_ip = "10.89.131.94";
+
     //New variables
     float roll_control = 0;
     float throttle_control = 0;
@@ -67,6 +78,7 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
     float yaw_control = 0;
     boolean in_operation = false;
     Handler handler_command = new Handler();
+    int mode_selection = 1;
 
     boolean spin_clkwise = false;
     boolean spin_ctclkwise = false;
@@ -125,6 +137,11 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
 
         initUI();
 
+        //Get the info on which mode to choose
+        Intent mIntent = getIntent();
+        mode_selection = mIntent.getIntExtra("selection", 1);
+        showToast("mode_selection: "+String.valueOf(mode_selection));
+
         // The callback for receiving the raw H264 video data for camera live view
         mReceivedVideoDataCallBack = new CameraReceivedVideoDataCallback() {
 
@@ -160,25 +177,29 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
         //test
         new Thread() {
             public void run() {
-                if (mDetector==null)
-                    handler_command.postDelayed(this,50);
-                else if (control){
-                    mPID.update_control_parameter(mDetector.x_err,mDetector.y_err,mDetector.z_err1);
-                    pitch_control = (float) mPID.pitch_control;
-                    roll_control = (float) mPID.roll_control;
-                    throttle_control = (float) mPID.throttle_control;
+                if (mode_selection == 1) {
+                    if (mDetector == null || !control)
+                        handler_command.postDelayed(this, 40);
+                    else {
+                        mPID.update_control_parameter(mDetector.x_err, mDetector.y_err, mDetector.z_err1);
+                        pitch_control = (float) mPID.pitch_control;
+                        roll_control = (float) mPID.roll_control;
+                        throttle_control = (float) mPID.throttle_control;
 
-                    if (Math.abs(pitch_control) < 0.1) pitch_control = 0;
-                    if (Math.abs(pitch_control) > 2) pitch_control = 1.5f;
-                    if (Math.abs(roll_control) < 0.1) roll_control = 0;
-                    if (Math.abs(roll_control) > 2) roll_control = 1.5f;
-                    if (Math.abs(throttle_control) < 0.1) throttle_control = 0;
-                    if (Math.abs(throttle_control) > 0.9) throttle_control = 0.9f;
-                    Send_Flight_Control_Command(pitch_control, roll_control, yaw_control, throttle_control);
-                    handler_command.postDelayed(this,40);
+                        if (Math.abs(pitch_control) < 0.1) pitch_control = 0;
+                        if (Math.abs(pitch_control) > 2) pitch_control = 1.5f;
+                        if (Math.abs(roll_control) < 0.1) roll_control = 0;
+                        if (Math.abs(roll_control) > 2) roll_control = 1.5f;
+                        if (Math.abs(throttle_control) < 0.1) throttle_control = 0;
+                        if (Math.abs(throttle_control) > 0.9) throttle_control = 0.9f;
+
+                        Send_Flight_Control_Command(pitch_control, roll_control, yaw_control, throttle_control);
+                        handler_command.postDelayed(this, 40);
+                    }
                 }
-                else{
-                    handler_command.postDelayed(this,40);
+                else if (control){
+                    Send_Flight_Control_Command(pitch_control, roll_control, yaw_control, throttle_control);
+                    handler_command.postDelayed(this, 40);
                 }
             }
         }.start();
@@ -242,11 +263,11 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
             public void onClick(View v){
                 new Thread() {
                     public void run() {
-                        collect_data = !collect_data;
+                        /*collect_data = !collect_data;
                         if (collect_data)
                             showToast("Data collecting began!");
                         else
-                            showToast("Data collecting terminated!");
+                            showToast("Data collecting terminated!"); */
                         /*filename = "frame" + String.valueOf(counter_file)+".jpg";
                         counter_file++;
                         FileOutputStream out = null;
@@ -422,13 +443,15 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
             mCodecManager = new DJICodecManager(this, surface, width, height);
         }
 
-        mRgba = new Mat();
-        mDetector = new ColorBlobDetector();
-        mSpectrum = new Mat();
-        mBlobColorRgba = new Scalar(255);
-        mBlobColorHsv = new Scalar(255);
-        SPECTRUM_SIZE = new Size(200, 64);
-        CONTOUR_COLOR = new Scalar(255,0,0,255);
+        if (mode_selection == 1) {
+            mRgba = new Mat();
+            mDetector = new ColorBlobDetector();
+            mSpectrum = new Mat();
+            mBlobColorRgba = new Scalar(255);
+            mBlobColorHsv = new Scalar(255);
+            SPECTRUM_SIZE = new Size(200, 64);
+            CONTOUR_COLOR = new Scalar(255, 0, 0, 255);
+        }
     }
 
     //
@@ -453,72 +476,149 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
         //String s1 = String.valueOf(mDetector.x + mDetector.w / 2) + "Y:" + String.valueOf(mDetector.y + mDetector.h / 2);
-        String s1 = "pitch:" + String.valueOf(pitch_control) + "z_crt:" + String.valueOf(mDetector.z_err1);
-        text1.setText(s1);
-        String s2 = "z_int:" + String.valueOf(mPID.z_inte_error);
-        text2.setText(s2);
+        if (mode_selection == 1) {
+            String s1 = "pitch:" + String.valueOf(pitch_control) + "z_crt:" + String.valueOf(mDetector.z_err1);
+            text1.setText(s1);
+            String s2 = "z_int:" + String.valueOf(mPID.z_inte_error);
+            text2.setText(s2);
+        }
         //text1.setText(String.valueOf(mDetector.w * mDetector.h));
         //String ss = "FrameSize: " + String.valueOf(mDetector.width) + "*" + String.valueOf(mDetector.height);
         //text2.setText(ss);
 
-        if (step_count != 6){
+        if (step_count != 5){
             step_count++;
         }
         else{
             step_count = 0;
 
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    Bitmap frame_bmp = mVideoSurface.getBitmap();
-                    Utils.bitmapToMat(frame_bmp, mRgba);  // frame_bmp is in ARGB format, mRgba is in RBGA format
+            //Determine whether to send to pc or not
+            if (mode_selection == 1) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Bitmap frame_bmp = mVideoSurface.getBitmap();
+                        Utils.bitmapToMat(frame_bmp, mRgba);  // frame_bmp is in ARGB format, mRgba is in RBGA format
 
-                    //Todo: Do image processing stuff here
-                    mRgba.convertTo(mRgba,-1,1.5,0);  // Increase intensity(light compensation) by 2
+                        //Todo: Do image processing stuff here
+                        mRgba.convertTo(mRgba, -1, 1.5, 0);  // Increase intensity(light compensation) by 2
 
-                    if (mIsColorSelected) {
-                        //Show the error-corrected color
-                        mBlobColorHsv = mDetector.get_new_hsvColor();
-                        mBlobColorRgba = converScalarHsv2Rgba(mBlobColorHsv);
+                        if (mIsColorSelected) {
+                            //Show the error-corrected color
+                            mBlobColorHsv = mDetector.get_new_hsvColor();
+                            mBlobColorRgba = converScalarHsv2Rgba(mBlobColorHsv);
 
-                        //Debug
-                        Log.i(TAG, "mDetector rgba color: (" + mBlobColorRgba.val[0] + ", " + mBlobColorRgba.val[1] +
-                                ", " + mBlobColorRgba.val[2] + ", " + mBlobColorRgba.val[3] + ")");
-                        Log.i(TAG, "mDetector hsv color: (" + mBlobColorHsv.val[0] + ", " + mBlobColorHsv.val[1] +
-                                ", " + mBlobColorHsv.val[2] + ", " + mBlobColorHsv.val[3] + ")");
+                            //Debug
+                            Log.i(TAG, "mDetector rgba color: (" + mBlobColorRgba.val[0] + ", " + mBlobColorRgba.val[1] +
+                                    ", " + mBlobColorRgba.val[2] + ", " + mBlobColorRgba.val[3] + ")");
+                            Log.i(TAG, "mDetector hsv color: (" + mBlobColorHsv.val[0] + ", " + mBlobColorHsv.val[1] +
+                                    ", " + mBlobColorHsv.val[2] + ", " + mBlobColorHsv.val[3] + ")");
 
-                        mDetector.process(mRgba);
-                        List<MatOfPoint> contours = mDetector.getContours();
-                        Log.e(TAG, "Contours count: " + contours.size());
-                        Imgproc.drawContours(mRgba, contours, -1, CONTOUR_COLOR, 2);
+                            mDetector.process(mRgba);
+                            List<MatOfPoint> contours = mDetector.getContours();
+                            Log.e(TAG, "Contours count: " + contours.size());
+                            Imgproc.drawContours(mRgba, contours, -1, CONTOUR_COLOR, 2);
 
-                        Mat colorLabel = mRgba.submat(4, 68, 4, 68);
-                        colorLabel.setTo(mBlobColorRgba);
+                            Mat colorLabel = mRgba.submat(4, 68, 4, 68);
+                            colorLabel.setTo(mBlobColorRgba);
 
-                        Mat spectrumLabel = mRgba.submat(4, 4 + mSpectrum.rows(), 70, 70 + mSpectrum.cols());
-                        mSpectrum.copyTo(spectrumLabel);
-                    }
+                            Mat spectrumLabel = mRgba.submat(4, 4 + mSpectrum.rows(), 70, 70 + mSpectrum.cols());
+                            mSpectrum.copyTo(spectrumLabel);
+                        }
 
 
-                    Utils.matToBitmap(mRgba, frame_bmp);
-                    Canvas canvas = mVideoSurface02.lockCanvas();
-                    canvas.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR);
-                    canvas.drawBitmap(frame_bmp, new Rect(0, 0, frame_bmp.getWidth(), frame_bmp.getHeight()),
-                            new Rect((canvas.getWidth() - frame_bmp.getWidth()) / 2,
-                                    (canvas.getHeight() - frame_bmp.getHeight()) / 2,
-                                    (canvas.getWidth() - frame_bmp.getWidth()) / 2 + frame_bmp.getWidth(),
-                                    (canvas.getHeight() - frame_bmp.getHeight()) / 2 + frame_bmp.getHeight()), null);
-                    mVideoSurface02.unlockCanvasAndPost(canvas);
+                        Utils.matToBitmap(mRgba, frame_bmp);
+                        Canvas canvas = mVideoSurface02.lockCanvas();
+                        canvas.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR);
+                        canvas.drawBitmap(frame_bmp, new Rect(0, 0, frame_bmp.getWidth(), frame_bmp.getHeight()),
+                                new Rect((canvas.getWidth() - frame_bmp.getWidth()) / 2,
+                                        (canvas.getHeight() - frame_bmp.getHeight()) / 2,
+                                        (canvas.getWidth() - frame_bmp.getWidth()) / 2 + frame_bmp.getWidth(),
+                                        (canvas.getHeight() - frame_bmp.getHeight()) / 2 + frame_bmp.getHeight()), null);
+                        mVideoSurface02.unlockCanvasAndPost(canvas);
 
-                    //FYP Report !!!!!!!!!!!!!!!!
-                    if (collect_data){
+                        //FYP Report !!!!!!!!!!!!!!!!
+                    /*if (collect_data){
                         String s = String.valueOf(counter_data) + " " + String.valueOf(mDetector.x+mDetector.w/2) + " " + String.valueOf(mDetector.y+mDetector.h/2);
                         s = s + " " + String.valueOf(mDetector.w * mDetector.h) + " " + String.valueOf(mDetector.width) + " " + String.valueOf(mDetector.height) + "\n";
                         generateNoteOnSD("data01.txt",s);
                         counter_data++;
+                    } */
                     }
-                }
-            }).start();
+                }).start();
+            }
+            else if (mode_selection == 2){
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        DataOutputStream dos = null;
+
+                        //Get bitmap
+                        Bitmap frame_bmp = mVideoSurface.getBitmap();
+
+                        //Convert the bitmap
+                        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                        frame_bmp.compress(Bitmap.CompressFormat.JPEG, 40, stream);
+                        byte[] byteArray = stream.toByteArray();
+                        InputStream is = new ByteArrayInputStream(byteArray);
+                        BufferedInputStream bis = new BufferedInputStream(is);
+
+                        Socket socket = null;
+                        try {
+                            //Send the image frame
+                            socket = new Socket(eduroam_pc_ip, 8080);
+                            dos = new DataOutputStream(socket.getOutputStream());
+
+                            //Send how many bytes to read for the image frame
+                            int size = byteArray.length;
+                            dos.writeInt(size);
+                            //Send information to server
+                            dos.writeInt(0);
+                            dos.writeInt(0);
+
+                            //Use buffered stream for sending image frame to increase the speed
+                            BufferedOutputStream bos = new BufferedOutputStream(socket.getOutputStream());
+
+                            //Send the image frame as bytes
+                            while ((i = bis.read()) > -1)
+                                bos.write(i);
+                            bos.flush();
+
+                            //Receive command from the server
+                            DataInputStream dis = new DataInputStream(socket.getInputStream());
+                            pitch_control = (float) dis.readDouble();
+                            roll_control = (float) dis.readDouble();
+                            throttle_control = (float) dis.readDouble();
+
+
+                            bos.close();
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            try {
+                                bis.close();
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                            if (dos != null) {
+                                try {
+                                    dos.flush();
+                                    dos.close();
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                            if (socket != null) {
+                                try {
+                                    socket.close();
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }
+                    }
+                }).start();
+            }
         }
     }
 
@@ -748,6 +848,9 @@ public class uavTrackingMain extends Activity implements View.OnTouchListener, S
 
     public boolean onTouch(View v, MotionEvent event) {
         //Todo: to give a notification for debugging
+        if (mode_selection == 2)
+            return false;
+
         //Very important! So that the onFrame function won't change the parameters before this section finishes
         mIsColorSelected = false;
 

@@ -2,6 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.dji.fpvtutorial">
 
+
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- DJI SDK -->
     <!-- DJI SDK need permission -->
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -30,10 +35,6 @@
         android:required="true" />
 
     <!-- DJI SDK -->
-
-
-
-
     <application
         android:name=".djiBgApplication"
         android:allowBackup="true"
@@ -44,13 +45,14 @@
 
         <!-- DJI SDK -->
         <uses-library android:name="com.android.future.usb.accessory" />
+
         <meta-data
             android:name="com.dji.sdk.API_KEY"
             android:value="44efd1e748eb14cebdeeb433" />
 
         <activity
             android:name="dji.sdk.SDKManager.DJIAoaControllerActivity"
-            android:theme="@android:style/Theme.Translucent" >
+            android:theme="@android:style/Theme.Translucent">
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED" />
             </intent-filter>
@@ -59,10 +61,11 @@
                 android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED"
                 android:resource="@xml/accessory_filter" />
         </activity>
-
-        <activity android:name=".uavTrackingMain"
+        <activity
+            android:name=".uavTrackingMain"
             android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
-
+        </activity>
+        <activity android:name=".StarterActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

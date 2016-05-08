@@ -2,7 +2,7 @@
 <resources>
 
     <string name="app_name">SDK3.0-FPV-Tutorial</string>
-    <string name="action_settings">Settings</string>   
+    <string name="action_settings">Settings</string>
     <string name="disconnected">Disconnected</string>
 
 </resources>

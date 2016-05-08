@@ -7,17 +7,17 @@ public class PID_Control {
     double UPPER_LIMIT_X_INT = 15000;
     double UPPER_LIMIT_Y_INT = 15000;
 
-    double pitch_gain_crt = -0.000021 - 0.000001;
+    double pitch_gain_crt = -0.000021 - 0.000002;
     double pitch_gain_int = -0.00000025;
-    double pitch_gain_der = -0.000022-0.000011;
+    double pitch_gain_der = -0.000022-0.000012;
     //double pitch_gain_crt = 0;
     //double pitch_gain_der = 0;
     //double pitch_gain_der = 0;
 
 
-    double roll_gain_crt = 0.0024 + 0.0004;
+    double roll_gain_crt = 0.0024 + 0.0007;
     double roll_gain_int = 0.00004;
-    double roll_gain_der = 0.0025 + 0.0003 + 0.0002;
+    double roll_gain_der = 0.0025 + 0.0003 + 0.0010;
 
     double throttle_gain_crt = -0.0008;
     double throttle_gain_int = -0.000004;
